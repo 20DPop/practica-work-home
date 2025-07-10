@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+
+</head>
+<body>
+ <div class="container py-5">
+        <h1 class="text-center mb-4">Chat <strong>online</strong></h1>
+
+        <div class="row">
+            <!-- Coloana pentru mesaje -->
+            <div class="col-md-8">
+                <div class="mb-3">
+                    <input type="text" class="form-control" onkeyup="sendMessage(event)"
+                        placeholder="Scrie un mesaj către ceilalți">
+                </div>
+                <ul id="messages" class="list-unstyled"></ul>
+            </div>
+
+            <!-- Coloana pentru utilizatori online -->
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-header fw-bold">
+                        Utilizatori Online
+                    </div>
+                    <ul id="online-users" class="list-group list-group-flush">
+                        <li class="list-group-item text-muted">Se încarcă...</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+<script>
+    function decodeJWTPayload(token) {
+        try {
+            const base64Url = token.split('.')[1];
+            const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+            const jsonPayload = decodeURIComponent(atob(base64).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''));
+            return JSON.parse(jsonPayload);
+        } catch (e) { 
+            return null; 
+        }
+    }
+    let currentUser = '';
+    const tokenCookie = document.cookie.split('; ').find(row => row.startsWith('token='));
+    if (tokenCookie) {
+        const token = tokenCookie.split('=')[1];
+        const payload = decodeJWTPayload(token);
+        if (payload) { 
+            currentUser = payload.username; 
+        }
+    }
+    const ws = new WebSocket(`ws://${window.location.host}/ws`);
+
+    ws.onopen = function () { 
+        console.log('WebSocket connection established'); 
+    };
+    ws.onmessage = function (event) {
+        console.log(`Received from server: ${event.data}`);
+        
+        try {
+            const data = JSON.parse(event.data);
+            if (data.type === 'user-list' && Array.isArray(data.users)) {
+                const userListElement = document.getElementById('online-users');
+                userListElement.innerHTML = ''; 
+                data.users.forEach(user => {
+                    const userItem = document.createElement('li');
+                    userItem.className = 'list-group-item';
+                    userItem.textContent = user;
+                    
+                    if (user === currentUser) {
+                        userItem.innerHTML += ' <small class="text-muted">(eu)</small>';
+                        userItem.classList.add('active');
+                    }
+                    userListElement.appendChild(userItem);
+                });
+
+            }
+        } catch (error) {
+            const messagesList = document.getElementById('messages');
+            const newMessage = document.createElement('li');
+            const separatorIndex = event.data.indexOf(': ');
+            if (separatorIndex > -1) {
+                const username = event.data.substring(0, separatorIndex);
+                const message = event.data.substring(separatorIndex + 2);
+                const isCurrentUser = (username === currentUser);
+
+                if (isCurrentUser) { newMessage.className = 'text-success text-end'; } 
+                else { newMessage.className = 'text-secondary'; }
+                newMessage.innerHTML = `<p><small class="text-muted">${isCurrentUser ? 'eu' : username}</small><br/>${message}</p>`;
+            } else {
+                
+                newMessage.className = 'text-center text-muted fst-italic';
+                newMessage.textContent = event.data;
+            }
+            messagesList.appendChild(newMessage);
+        }
+    };
+   
+    function sendMessage(event) {
+        if (event.key === 'Enter' && event.target.value.trim() !== '') {
+            const message = event.target.value;
+            ws.send(message);
+            event.target.value = '';
+        }
+    }
+
+
+        // const ws = new WebSocket(`ws://${window.location.host}/ws`);
+        // ws.onmessage = function (event) {
+        //     console.log(`Received from server: ${event.data}`);
+        //     const [token, message] = event.data.split('–');
+        //     const messagesList = document.getElementById('messages');
+        //     const newMessage = document.createElement('li');
+        //     const username = token;
+        //     const isCurentUser = document.cookie.includes('token=' + token);
+        //     if (isCurentUser) {
+        //         newMessage.className = 'text-success text-end';
+        //     } else {
+        //         newMessage.className = 'text-secondary';
+        //     }
+        //     newMessage.innerHTML = `<p><small class="text-muted">${isCurentUser ? 'eu' : username}</small><br/> ${message}</p>`;
+        //     messagesList.appendChild(newMessage);
+        // };
+        // ws.onopen = function () {
+        //     console.log('WebSocket connection established');
+        // };
+        
+        // function sendMessage(event) {
+        //     if (event.key === 'Enter') {
+        //         const message = event.target.value;
+        //         ws.send(message);
+        //         event.target.value = ''; // Clear the input field
+        //     }
+        // }
+
+        // function decodeJWTPayload(token) {
+        //     try {
+        //         const parts = token.split('.');
+        //         if (parts.length !== 3) return '';
+
+        //         const base64Url = parts[1];
+        //         const base64 = base64Url
+        //             .replace(/-/g, '+')
+        //             .replace(/_/g, '/');
+
+        //         const jsonPayload = decodeURIComponent(
+        //             atob(base64)
+        //                 .split('')
+        //                 .map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        //                 .join('')
+        //         );
+
+        //         return JSON.parse(jsonPayload);
+        //     } catch (e) {
+        //         return '';
+        //     }
+        // }
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+</body>
+</html>
